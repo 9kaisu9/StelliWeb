@@ -25,3 +25,11 @@ CREATE TABLE IF NOT EXISTS field_choices (
     field_id BIGINT NOT NULL REFERENCES fields(id),
     choice   VARCHAR(255)
 );
+
+CREATE TABLE IF NOT EXISTS entries (
+    id           INTEGER PRIMARY KEY,
+    list_id      BIGINT NOT NULL REFERENCES lists(id),
+    field_values TEXT NOT NULL,
+    search_text  TEXT NOT NULL DEFAULT '',
+    created_at   TIMESTAMP NOT NULL
+);
