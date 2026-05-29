@@ -1,5 +1,6 @@
 package com.stelli.stelli_backend.list;
 
+import com.stelli.stelli_backend.user.DataSeeder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,6 +28,7 @@ class ListApiTest {
 
     @Autowired WebApplicationContext webApplicationContext;
     @Autowired ObjectMapper objectMapper;
+    @Autowired DataSeeder dataSeeder;
 
     MockMvc mockMvc;
 
@@ -59,15 +61,59 @@ class ListApiTest {
     }
 
     @Test
-    void getAllLists_returnsCreatedList() throws Exception {
-        mockMvc.perform(post("/api/lists")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(restaurantListJson()))
-            .andExpect(status().isCreated());
+    void restaurantsTemplate_hasCorrectFieldsInOrder() throws Exception {
+        var lists = objectMapper.readTree(
+            mockMvc.perform(get("/api/lists")).andReturn().getResponse().getContentAsString());
+        var restaurantsId = lists.get(0).get("id").asLong();
+
+        mockMvc.perform(get("/api/lists/{id}", restaurantsId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.fields[0].name").value("Name"))
+            .andExpect(jsonPath("$.fields[0].type").value("TEXT"))
+            .andExpect(jsonPath("$.fields[1].name").value("Cuisine Type"))
+            .andExpect(jsonPath("$.fields[1].type").value("OPTION"))
+            .andExpect(jsonPath("$.fields[2].name").value("Rating"))
+            .andExpect(jsonPath("$.fields[2].type").value("RATING"))
+            .andExpect(jsonPath("$.fields[3].name").value("Price Range"))
+            .andExpect(jsonPath("$.fields[4].name").value("Location"))
+            .andExpect(jsonPath("$.fields[5].name").value("Notes"))
+            .andExpect(jsonPath("$.fields[6].name").value("Has Usable Toilet"))
+            .andExpect(jsonPath("$.fields[6].type").value("BOOLEAN"));
+    }
+
+    @Test
+    void seeder_isIdempotent_doesNotDuplicateTemplates() throws Exception {
+        dataSeeder.run(null);
 
         mockMvc.perform(get("/api/lists"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].name").value("Restaurants"));
+            .andExpect(jsonPath("$[4]").doesNotExist());
+    }
+
+    @Test
+    void onStartup_fourDefaultTemplatesAreSeeded() throws Exception {
+        mockMvc.perform(get("/api/lists"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].name").value("Restaurants"))
+            .andExpect(jsonPath("$[1].name").value("Movies"))
+            .andExpect(jsonPath("$[2].name").value("Journal"))
+            .andExpect(jsonPath("$[3].name").value("Travel Sites"))
+            .andExpect(jsonPath("$[4]").doesNotExist());
+    }
+
+    @Test
+    void getAllLists_returnsCreatedList() throws Exception {
+        var created = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(restaurantListJson()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString());
+        var id = created.get("id").asLong();
+
+        mockMvc.perform(get("/api/lists"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == " + id + ")]").isNotEmpty());
     }
 
     @Test
