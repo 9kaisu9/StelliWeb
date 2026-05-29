@@ -93,6 +93,95 @@ class ListApiTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void updateList_name_returns200WithUpdatedName() throws Exception {
+        var created = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(restaurantListJson()))
+                .andReturn().getResponse().getContentAsString());
+        var id = created.get("id").asLong();
+
+        var update = objectMapper.writeValueAsString(Map.of(
+            "name", "Best Restaurants", "description", "Updated", "icon", "🍕"
+        ));
+
+        mockMvc.perform(put("/api/lists/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(update))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Best Restaurants"))
+            .andExpect(jsonPath("$.description").value("Updated"))
+            .andExpect(jsonPath("$.icon").value("🍕"));
+    }
+
+    @Test
+    void replaceFields_addsAndRemovesFields_returns200() throws Exception {
+        var created = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(restaurantListJson()))
+                .andReturn().getResponse().getContentAsString());
+        var id = created.get("id").asLong();
+
+        var newFields = objectMapper.writeValueAsString(List.of(
+            Map.of("name", "Rating", "type", "NUMBER", "required", false, "displayOrder", 0, "choices", List.of()),
+            Map.of("name", "Notes", "type", "TEXT", "required", false, "displayOrder", 1, "choices", List.of())
+        ));
+
+        mockMvc.perform(put("/api/lists/{id}/fields", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(newFields))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.fields.length()").value(2))
+            .andExpect(jsonPath("$.fields[0].name").value("Rating"))
+            .andExpect(jsonPath("$.fields[1].name").value("Notes"));
+    }
+
+    @Test
+    void deleteList_returns204_andSubsequentGetReturns404() throws Exception {
+        var created = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(restaurantListJson()))
+                .andReturn().getResponse().getContentAsString());
+        var id = created.get("id").asLong();
+
+        mockMvc.perform(delete("/api/lists/{id}", id))
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/lists/{id}", id))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteList_unknownId_returns404() throws Exception {
+        mockMvc.perform(delete("/api/lists/99999"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void replaceFields_unknownId_returns404() throws Exception {
+        var fields = objectMapper.writeValueAsString(List.of(
+            Map.of("name", "X", "type", "TEXT", "required", false, "displayOrder", 0, "choices", List.of())
+        ));
+        mockMvc.perform(put("/api/lists/99999/fields")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(fields))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateList_unknownId_returns404() throws Exception {
+        var update = objectMapper.writeValueAsString(Map.of(
+            "name", "X", "description", "", "icon", ""
+        ));
+        mockMvc.perform(put("/api/lists/99999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(update))
+            .andExpect(status().isNotFound());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"OPTION", "MULTI_OPTION"})
     void createList_choiceFieldWithNoChoices_returns400(String fieldType) throws Exception {
