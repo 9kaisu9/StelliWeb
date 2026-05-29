@@ -23,8 +23,33 @@ public class ListService {
         list.setDescription(request.description());
         list.setIcon(request.icon());
         list.setUserId(DataSeeder.DEFAULT_USER_ID);
+        addFields(list, request.fields());
+        return toResponse(listRepository.save(list));
+    }
 
-        for (FieldRequest fr : request.fields()) {
+    @Transactional(readOnly = true)
+    public List<ListResponse> findAll() {
+        return listRepository.findByUserId(DataSeeder.DEFAULT_USER_ID)
+                .stream().map(this::toResponse).toList();
+    }
+
+    public void delete(Long id) {
+        if (!listRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        listRepository.deleteById(id);
+    }
+
+    public ListResponse replaceFields(Long id, List<FieldRequest> fieldRequests) {
+        StelliList list = listRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        list.getFields().clear();
+        addFields(list, fieldRequests);
+        return toResponse(listRepository.save(list));
+    }
+
+    private void addFields(StelliList list, List<FieldRequest> fieldRequests) {
+        for (FieldRequest fr : fieldRequests) {
             if ((fr.type() == FieldType.OPTION || fr.type() == FieldType.MULTI_OPTION)
                     && fr.choices().isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -39,14 +64,15 @@ public class ListService {
             field.setList(list);
             list.getFields().add(field);
         }
-
-        return toResponse(listRepository.save(list));
     }
 
-    @Transactional(readOnly = true)
-    public List<ListResponse> findAll() {
-        return listRepository.findByUserId(DataSeeder.DEFAULT_USER_ID)
-                .stream().map(this::toResponse).toList();
+    public ListResponse update(Long id, UpdateListRequest request) {
+        StelliList list = listRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        list.setName(request.name());
+        list.setDescription(request.description());
+        list.setIcon(request.icon());
+        return toResponse(listRepository.save(list));
     }
 
     @Transactional(readOnly = true)

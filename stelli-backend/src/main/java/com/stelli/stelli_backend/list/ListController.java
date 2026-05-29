@@ -28,4 +28,20 @@ public class ListController {
     public ListResponse getById(@PathVariable Long id) {
         return listService.findById(id);
     }
+
+    @PutMapping("/{id}")
+    public ListResponse update(@PathVariable Long id, @RequestBody UpdateListRequest request) {
+        return listService.update(id, request);
+    }
+
+    @PutMapping("/{id}/fields")
+    public ListResponse replaceFields(@PathVariable Long id, @RequestBody java.util.List<FieldRequest> fields) {
+        return listService.replaceFields(id, fields);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        listService.delete(id);
+    }
 }
