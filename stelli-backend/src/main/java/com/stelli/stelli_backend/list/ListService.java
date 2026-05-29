@@ -16,6 +16,7 @@ import java.util.List;
 public class ListService {
 
     private final ListRepository listRepository;
+    private final FieldRepository fieldRepository;
 
     public ListResponse create(CreateListRequest request) {
         StelliList list = new StelliList();
@@ -24,7 +25,7 @@ public class ListService {
         list.setIcon(request.icon());
         list.setUserId(DataSeeder.DEFAULT_USER_ID);
         addFields(list, request.fields());
-        return toResponse(listRepository.save(list));
+        return toResponseFromMemory(listRepository.save(list));
     }
 
     @Transactional(readOnly = true)
@@ -45,7 +46,7 @@ public class ListService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         list.getFields().clear();
         addFields(list, fieldRequests);
-        return toResponse(listRepository.save(list));
+        return toResponseFromMemory(listRepository.save(list));
     }
 
     private void addFields(StelliList list, List<FieldRequest> fieldRequests) {
@@ -83,11 +84,19 @@ public class ListService {
     }
 
     private ListResponse toResponse(StelliList list) {
-        List<FieldResponse> fields = list.getFields().stream()
+        return toResponse(list, fieldRepository.findByListId(list.getId()));
+    }
+
+    private ListResponse toResponseFromMemory(StelliList list) {
+        return toResponse(list, new java.util.ArrayList<>(list.getFields()));
+    }
+
+    private ListResponse toResponse(StelliList list, List<Field> fields) {
+        List<FieldResponse> fieldResponses = fields.stream()
                 .map(f -> new FieldResponse(f.getId(), f.getName(), f.getType(),
                         f.isRequired(), f.getDisplayOrder(), f.getChoices()))
                 .toList();
         return new ListResponse(list.getId(), list.getName(), list.getDescription(),
-                list.getIcon(), fields, list.getCreatedAt());
+                list.getIcon(), fieldResponses, list.getCreatedAt());
     }
 }
