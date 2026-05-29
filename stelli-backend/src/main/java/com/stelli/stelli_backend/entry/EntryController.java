@@ -28,4 +28,16 @@ public class EntryController {
     public EntryResponse getById(@PathVariable Long listId, @PathVariable Long id) {
         return entryService.findById(listId, id);
     }
+
+    @PutMapping("/{id}")
+    public EntryResponse update(@PathVariable Long listId, @PathVariable Long id,
+                                @RequestBody UpdateEntryRequest request) {
+        return entryService.update(listId, id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long listId, @PathVariable Long id) {
+        entryService.delete(listId, id);
+    }
 }

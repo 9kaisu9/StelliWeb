@@ -160,4 +160,96 @@ class EntryApiTest {
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.fieldValues." + nameFieldId).value("Sakura Sushi"));
     }
+
+    @Test
+    void updateEntry_updatesFieldValues() throws Exception {
+        var listId = createList();
+        var nameFieldId = getFirstFieldId(listId);
+
+        var createBody = objectMapper.writeValueAsString(Map.of(
+            "fieldValues", Map.of(String.valueOf(nameFieldId), "Sakura Sushi")
+        ));
+        var entryId = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists/{listId}/entries", listId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody))
+                .andReturn().getResponse().getContentAsString()
+        ).get("id").asLong();
+
+        var updateBody = objectMapper.writeValueAsString(Map.of(
+            "fieldValues", Map.of(String.valueOf(nameFieldId), "Ramen House")
+        ));
+        mockMvc.perform(put("/api/lists/{listId}/entries/{id}", listId, entryId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.fieldValues." + nameFieldId).value("Ramen House"));
+    }
+
+    @Test
+    void updateEntry_refreshesSearchText() throws Exception {
+        var listId = createList();
+        var nameFieldId = getFirstFieldId(listId);
+
+        var createBody = objectMapper.writeValueAsString(Map.of(
+            "fieldValues", Map.of(String.valueOf(nameFieldId), "Old Name")
+        ));
+        var entryId = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists/{listId}/entries", listId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody))
+                .andReturn().getResponse().getContentAsString()
+        ).get("id").asLong();
+
+        var updateBody = objectMapper.writeValueAsString(Map.of(
+            "fieldValues", Map.of(String.valueOf(nameFieldId), "New Name")
+        ));
+        mockMvc.perform(put("/api/lists/{listId}/entries/{id}", listId, entryId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.searchText").value(org.hamcrest.Matchers.containsString("New Name")))
+            .andExpect(jsonPath("$.searchText").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Old Name"))));
+    }
+
+    @Test
+    void updateEntry_unknownEntry_returns404() throws Exception {
+        var listId = createList();
+        var updateBody = objectMapper.writeValueAsString(Map.of("fieldValues", Map.of()));
+
+        mockMvc.perform(put("/api/lists/{listId}/entries/99999", listId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteEntry_removesEntry() throws Exception {
+        var listId = createList();
+        var nameFieldId = getFirstFieldId(listId);
+
+        var body = objectMapper.writeValueAsString(Map.of(
+            "fieldValues", Map.of(String.valueOf(nameFieldId), "Sakura Sushi")
+        ));
+        var entryId = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists/{listId}/entries", listId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                .andReturn().getResponse().getContentAsString()
+        ).get("id").asLong();
+
+        mockMvc.perform(delete("/api/lists/{listId}/entries/{id}", listId, entryId))
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/lists/{listId}/entries/{id}", listId, entryId))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteEntry_unknownEntry_returns404() throws Exception {
+        var listId = createList();
+
+        mockMvc.perform(delete("/api/lists/{listId}/entries/99999", listId))
+            .andExpect(status().isNotFound());
+    }
 }

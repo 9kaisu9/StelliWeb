@@ -62,6 +62,23 @@ public class EntryService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    public EntryResponse update(Long listId, Long entryId, UpdateEntryRequest request) {
+        var entry = entryRepository.findById(entryId)
+            .filter(e -> e.getListId().equals(listId))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        var fields = fieldRepository.findByListId(listId);
+        entry.setFieldValues(request.fieldValues());
+        entry.setSearchText(buildSearchText(fields, request.fieldValues()));
+        return toResponse(entryRepository.save(entry));
+    }
+
+    public void delete(Long listId, Long entryId) {
+        var entry = entryRepository.findById(entryId)
+            .filter(e -> e.getListId().equals(listId))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        entryRepository.delete(entry);
+    }
+
     private String buildSearchText(List<com.stelli.stelli_backend.list.Field> fields, Map<String, Object> fieldValues) {
         return fields.stream()
             .filter(f -> SEARCHABLE.contains(f.getType()))
