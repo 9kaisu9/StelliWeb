@@ -20,8 +20,14 @@ public class EntryController {
     }
 
     @GetMapping
-    public List<EntryResponse> getAll(@PathVariable Long listId) {
-        return entryService.findAllByListId(listId);
+    public List<EntryResponse> getAll(@PathVariable Long listId,
+                                      @RequestParam(required = false) String sortField,
+                                      @RequestParam(required = false) String sortDir,
+                                      @RequestParam(required = false) String filterField,
+                                      @RequestParam(required = false) String filterValue,
+                                      @RequestParam(required = false) String q) {
+        return entryService.search(listId,
+            new EntrySearchCriteria(sortField, sortDir, filterField, filterValue, q));
     }
 
     @GetMapping("/{id}")

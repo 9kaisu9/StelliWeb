@@ -44,11 +44,11 @@ public class EntryService {
     }
 
     @Transactional(readOnly = true)
-    public List<EntryResponse> findAllByListId(Long listId) {
+    public List<EntryResponse> search(Long listId, EntrySearchCriteria criteria) {
         if (!listRepository.existsById(listId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        return entryRepository.findByListId(listId).stream().map(this::toResponse).toList();
+        return entryRepository.search(listId, criteria).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)

@@ -58,6 +58,122 @@ class EntryApiTest {
             .get("fields").get(0).get("id").asLong();
     }
 
+    private long createEntry(long listId, Map<String, Object> fieldValues) throws Exception {
+        var body = objectMapper.writeValueAsString(Map.of("fieldValues", fieldValues));
+        var created = objectMapper.readTree(
+            mockMvc.perform(post("/api/lists/{listId}/entries", listId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                .andReturn().getResponse().getContentAsString());
+        return created.get("id").asLong();
+    }
+
+    private tools.jackson.databind.JsonNode getFields(long listId) throws Exception {
+        return objectMapper.readTree(
+            mockMvc.perform(get("/api/lists/{id}", listId)).andReturn().getResponse().getContentAsString()
+        ).get("fields");
+    }
+
+    @Test
+    void filterEntries_byExactFieldValue_returnsOnlyMatching() throws Exception {
+        var listId = createList();
+        var fields = getFields(listId);
+        var nameFieldId = fields.get(0).get("id").asText();
+        var ratingFieldId = fields.get(1).get("id").asText();
+        createEntry(listId, Map.of(nameFieldId, "Sakura Sushi", ratingFieldId, 5));
+        createEntry(listId, Map.of(nameFieldId, "Ramen House", ratingFieldId, 3));
+
+        mockMvc.perform(get("/api/lists/{listId}/entries", listId)
+                .param("filterField", ratingFieldId).param("filterValue", "5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].fieldValues." + nameFieldId).value("Sakura Sushi"));
+    }
+
+    @Test
+    void sortEntries_byNumericField_ascending() throws Exception {
+        var listId = createList();
+        var fields = getFields(listId);
+        var nameFieldId = fields.get(0).get("id").asText();
+        var ratingFieldId = fields.get(1).get("id").asText();
+        createEntry(listId, Map.of(nameFieldId, "B", ratingFieldId, 10));
+        createEntry(listId, Map.of(nameFieldId, "A", ratingFieldId, 2));
+        createEntry(listId, Map.of(nameFieldId, "C", ratingFieldId, 9));
+
+        mockMvc.perform(get("/api/lists/{listId}/entries", listId)
+                .param("sortField", ratingFieldId).param("sortDir", "asc"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].fieldValues." + nameFieldId).value("A"))
+            .andExpect(jsonPath("$[1].fieldValues." + nameFieldId).value("C"))
+            .andExpect(jsonPath("$[2].fieldValues." + nameFieldId).value("B"));
+    }
+
+    @Test
+    void sortEntries_byNumericField_descending() throws Exception {
+        var listId = createList();
+        var fields = getFields(listId);
+        var nameFieldId = fields.get(0).get("id").asText();
+        var ratingFieldId = fields.get(1).get("id").asText();
+        createEntry(listId, Map.of(nameFieldId, "B", ratingFieldId, 10));
+        createEntry(listId, Map.of(nameFieldId, "A", ratingFieldId, 2));
+        createEntry(listId, Map.of(nameFieldId, "C", ratingFieldId, 9));
+
+        mockMvc.perform(get("/api/lists/{listId}/entries", listId)
+                .param("sortField", ratingFieldId).param("sortDir", "desc"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].fieldValues." + nameFieldId).value("B"))
+            .andExpect(jsonPath("$[1].fieldValues." + nameFieldId).value("C"))
+            .andExpect(jsonPath("$[2].fieldValues." + nameFieldId).value("A"));
+    }
+
+    @Test
+    void sortEntries_byTextField_ascending() throws Exception {
+        var listId = createList();
+        var nameFieldId = String.valueOf(getFirstFieldId(listId));
+        createEntry(listId, Map.of(nameFieldId, "Charlie"));
+        createEntry(listId, Map.of(nameFieldId, "Alpha"));
+        createEntry(listId, Map.of(nameFieldId, "Bravo"));
+
+        mockMvc.perform(get("/api/lists/{listId}/entries", listId)
+                .param("sortField", nameFieldId).param("sortDir", "asc"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].fieldValues." + nameFieldId).value("Alpha"))
+            .andExpect(jsonPath("$[1].fieldValues." + nameFieldId).value("Bravo"))
+            .andExpect(jsonPath("$[2].fieldValues." + nameFieldId).value("Charlie"));
+    }
+
+    @Test
+    void filterAndSort_combined() throws Exception {
+        var listId = createList();
+        var fields = getFields(listId);
+        var nameFieldId = fields.get(0).get("id").asText();
+        var ratingFieldId = fields.get(1).get("id").asText();
+        createEntry(listId, Map.of(nameFieldId, "Bravo", ratingFieldId, 5));
+        createEntry(listId, Map.of(nameFieldId, "Alpha", ratingFieldId, 5));
+        createEntry(listId, Map.of(nameFieldId, "Charlie", ratingFieldId, 2));
+
+        mockMvc.perform(get("/api/lists/{listId}/entries", listId)
+                .param("filterField", ratingFieldId).param("filterValue", "5")
+                .param("sortField", nameFieldId).param("sortDir", "asc"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].fieldValues." + nameFieldId).value("Alpha"))
+            .andExpect(jsonPath("$[1].fieldValues." + nameFieldId).value("Bravo"));
+    }
+
+    @Test
+    void searchEntries_byKeyword_returnsOnlyMatching_caseInsensitive() throws Exception {
+        var listId = createList();
+        var nameFieldId = String.valueOf(getFirstFieldId(listId));
+        createEntry(listId, Map.of(nameFieldId, "Sakura Sushi"));
+        createEntry(listId, Map.of(nameFieldId, "Ramen House"));
+
+        mockMvc.perform(get("/api/lists/{listId}/entries", listId).param("q", "sushi"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].fieldValues." + nameFieldId).value("Sakura Sushi"));
+    }
+
     @Test
     void createEntry_searchTextPopulatedFromSearchableFields() throws Exception {
         var listId = createList();
