@@ -44,11 +44,11 @@ public class EntryService {
     }
 
     @Transactional(readOnly = true)
-    public List<EntryResponse> findAllByListId(Long listId) {
+    public List<EntryResponse> search(Long listId, EntrySearchCriteria criteria) {
         if (!listRepository.existsById(listId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        return entryRepository.findByListId(listId).stream().map(this::toResponse).toList();
+        return entryRepository.search(listId, criteria).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -60,6 +60,23 @@ public class EntryService {
             .filter(e -> e.getListId().equals(listId))
             .map(this::toResponse)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    public EntryResponse update(Long listId, Long entryId, UpdateEntryRequest request) {
+        var entry = entryRepository.findById(entryId)
+            .filter(e -> e.getListId().equals(listId))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        var fields = fieldRepository.findByListId(listId);
+        entry.setFieldValues(request.fieldValues());
+        entry.setSearchText(buildSearchText(fields, request.fieldValues()));
+        return toResponse(entryRepository.save(entry));
+    }
+
+    public void delete(Long listId, Long entryId) {
+        var entry = entryRepository.findById(entryId)
+            .filter(e -> e.getListId().equals(listId))
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        entryRepository.delete(entry);
     }
 
     private String buildSearchText(List<com.stelli.stelli_backend.list.Field> fields, Map<String, Object> fieldValues) {
