@@ -32,4 +32,7 @@ build/
 ### VS Code ###
 .vscode/
 
-node_modules/stelli.db
+node_modules/
+
+### SQLite runtime database ###
+stelli.db
